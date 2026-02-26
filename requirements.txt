@@ -1,5 +1,5 @@
 flask
-requests
-python-dotenv
 supabase
+google-generativeai
+python-dotenv
 gunicorn
