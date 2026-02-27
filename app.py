@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from supabase import create_client
 import google.generativeai as genai
 import os
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app) # Enable CORS for all routes
 
 # --- CONFIGURATION ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -31,20 +33,31 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
-    user_id = data.get("user_id")
-    message = data.get("message")
-
-    if not message:
-        return jsonify({"reply": "Error: Send a proper message."}), 400
-
     try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"reply": "Error: Invalid JSON or empty body."}), 200
+
+        user_id = data.get("user_id")
+        message = data.get("message")
+
+        if not message:
+            return jsonify({"reply": "Error: Send a proper message."}), 200
+
         # 1. Try Gemini
         try:
+            if not GEMINI_API_KEY:
+                return jsonify({"reply": "Gemini API Key is missing on the server."}), 200
+            
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(message)
+            
             if response.candidates:
-                reply = response.text
+                try:
+                    reply = response.text
+                except ValueError:
+                    # This happens if the text is blocked by safety filters
+                    reply = "I'm sorry, I cannot discuss this topic due to safety guidelines."
             else:
                 reply = "AI: I cannot answer this due to safety filter."
         except Exception as ge:
@@ -64,6 +77,7 @@ def chat():
         return jsonify({"reply": reply})
 
     except Exception as e:
+        print(f"Chat Route Critical Error: {str(e)}")
         return jsonify({"reply": f"Internal Server Error: {str(e)}"}), 200
 
 if __name__ == "__main__":
