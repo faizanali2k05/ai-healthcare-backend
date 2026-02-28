@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client
-import google.generativeai as genai
 import os
 from dotenv import load_dotenv
+
+# Hugging Face transformers for model inference
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 load_dotenv()
 
@@ -13,7 +15,7 @@ CORS(app) # Enable CORS for all routes
 # --- CONFIGURATION ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# We no longer use Gemini; the backend now relies on a Hugging Face model
 
 # Initialize Supabase
 supabase = None
@@ -23,9 +25,14 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"Supabase Client Init Failed: {e}")
 
-# Initialize Gemini
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# Load the Hugging Face translation/generation model once at startup
+try:
+    tokenizer = AutoTokenizer.from_pretrained("FremyCompany/opus-mt-nl-en-healthcare")
+    model = AutoModelForSeq2SeqLM.from_pretrained("FremyCompany/opus-mt-nl-en-healthcare")
+except Exception as e:
+    print(f"Failed to load HF model: {e}")
+    tokenizer = None
+    model = None
 
 @app.route("/")
 def home():
@@ -44,24 +51,16 @@ def chat():
         if not message:
             return jsonify({"reply": "Error: Send a proper message."}), 200
 
-        # 1. Try Gemini
+        # 1. Generate reply using the Hugging Face model
         try:
-            if not GEMINI_API_KEY:
-                return jsonify({"reply": "Gemini API Key is missing on the server."}), 200
-            
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(message)
-            
-            if response.candidates:
-                try:
-                    reply = response.text
-                except ValueError:
-                    # This happens if the text is blocked by safety filters
-                    reply = "I'm sorry, I cannot discuss this topic due to safety guidelines."
-            else:
-                reply = "AI: I cannot answer this due to safety filter."
+            if not model or not tokenizer:
+                return jsonify({"reply": "Model not loaded on the server."}), 200
+
+            inputs = tokenizer(message, return_tensors="pt")
+            outputs = model.generate(**inputs)
+            reply = tokenizer.decode(outputs[0], skip_special_tokens=True)
         except Exception as ge:
-            return jsonify({"reply": f"Gemini API Error: {str(ge)}"}), 200
+            return jsonify({"reply": f"Model inference error: {str(ge)}"}), 200
 
         # 2. Try Supabase
         if supabase and user_id:

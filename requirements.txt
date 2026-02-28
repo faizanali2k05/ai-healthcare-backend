@@ -1,6 +1,6 @@
 flask
 flask-cors
 supabase
-google-generativeai
 python-dotenv
 gunicorn
+transformers  # added for Hugging Face model inference
