@@ -13,8 +13,8 @@ app = Flask(__name__)
 CORS(app) # Enable CORS for all routes
 
 # --- CONFIGURATION ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("DATABASE_URL")
+SUPABASE_KEY = os.getenv("DATABASE_KEY")
 # We no longer use Gemini; the backend now relies on a Hugging Face model
 
 # Initialize Supabase
@@ -27,10 +27,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 # Load the Hugging Face translation/generation model once at startup
 try:
-    tokenizer = AutoTokenizer.from_pretrained("FremyCompany/opus-mt-nl-en-healthcare")
-    model = AutoModelForSeq2SeqLM.from_pretrained("FremyCompany/opus-mt-nl-en-healthcare")
+    tokenizer = AutoTokenizer.from_pretrained("GoogleCloud/opus-mt-nl-en-healthcare")
+    model = AutoModelForSeq2SeqLM.from_pretrained("GoogleCloud/opus-mt-nl-en-healthcare")
 except Exception as e:
-    print(f"Failed to load HF model: {e}")
+    print(f"Failed to load Cloud model: {e}")
     tokenizer = None
     model = None
 
